@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow,
                                QPushButton, QGraphicsView, QVBoxLayout, QGraphicsRectItem, QGraphicsScene,
                                QGraphicsPixmapItem, QTabWidget, QLabel, QWidget, QGroupBox, QSplashScreen, QComboBox,
                                QFrame, QFormLayout, QSizePolicy, QRadioButton, QHBoxLayout, QGridLayout, QButtonGroup)
-from PySide6.QtGui import QPixmap, Qt
+from PySide6.QtGui import QPixmap, Qt, QIcon
 
 icon_key = "Icon"
 nameplate_key = "Nameplate"
@@ -374,6 +374,7 @@ class ProfileExplorerWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication([])
     app.setStyle("Fusion")
+    app.setWindowIcon(QIcon("./icon.ico"))
     mainWindow = ProfileExplorerWindow()
 
     sys.exit(app.exec())
