@@ -374,7 +374,7 @@ class ProfileExplorerWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication([])
     app.setStyle("Fusion")
-    app.setWindowIcon(QIcon("./icon.ico"))
+    app.setWindowIcon(QIcon("./data/icon.ico"))
     mainWindow = ProfileExplorerWindow()
 
     sys.exit(app.exec())
