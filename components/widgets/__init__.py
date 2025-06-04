@@ -1,1 +1,1 @@
-from .profiles import ProfileView
+from .profile_view import ProfileView

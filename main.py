@@ -12,7 +12,8 @@ from PySide6.QtCore import QRect, QPoint
 from PySide6.QtWidgets import (QApplication, QMainWindow,
                                QPushButton, QGraphicsView, QVBoxLayout, QGraphicsRectItem, QGraphicsScene,
                                QGraphicsPixmapItem, QTabWidget, QLabel, QWidget, QGroupBox, QSplashScreen, QComboBox,
-                               QFrame, QFormLayout, QSizePolicy, QRadioButton, QHBoxLayout, QGridLayout, QButtonGroup)
+                               QFrame, QFormLayout, QSizePolicy, QRadioButton, QHBoxLayout, QGridLayout, QButtonGroup,
+                               QLineEdit)
 from PySide6.QtGui import QPixmap, Qt, QIcon
 
 from components.widgets import ProfileView
@@ -22,6 +23,8 @@ from data_management.img_data import ICON_KEY, LANG_EN, LANG_JP, NAMEPLATE_KEY, 
 
 
 class ProfileExplorerWindow(QMainWindow):
+    max_profile_name_length = 10
+
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
 
@@ -65,6 +68,11 @@ class ProfileExplorerWindow(QMainWindow):
 
         self.menu_tabs = QTabWidget()
 
+        self.profile_name_entry = QLineEdit()
+        self.profile_name_entry.setMaxLength(self.max_profile_name_length)
+        self.profile_name_entry.setPlaceholderText(f"Max Characters: {self.max_profile_name_length}")
+        self.profile_name_entry.textChanged.connect(self.handleProfileNameChanged)
+        self.profile_name_entry.setText("PLAYER")
         self.icon_options_select = QComboBox()
         self.icon_options_select.currentIndexChanged.connect(self.handleIconSelectionChanged)
         self.nameplate_options_select = QComboBox()
@@ -72,13 +80,14 @@ class ProfileExplorerWindow(QMainWindow):
         self.frame_options_select = QComboBox()
         self.frame_options_select.currentIndexChanged.connect(self.handleFrameSelectionChanged)
 
-        self.icon_options_layout = QFormLayout()
-        self.icon_options_layout.addRow("Icon:", self.icon_options_select)
-        self.icon_options_layout.addRow("Nameplate:", self.nameplate_options_select)
-        self.icon_options_layout.addRow("Frame:", self.frame_options_select)
+        self.profile_options_layout = QFormLayout()
+        self.profile_options_layout.addRow("Profile Name:", self.profile_name_entry)
+        self.profile_options_layout.addRow("Icon:", self.icon_options_select)
+        self.profile_options_layout.addRow("Nameplate:", self.nameplate_options_select)
+        self.profile_options_layout.addRow("Frame:", self.frame_options_select)
 
         self.icon_options_widget = QWidget()
-        self.icon_options_widget.setLayout(self.icon_options_layout)
+        self.icon_options_widget.setLayout(self.profile_options_layout)
         self.menu_tabs.addTab(self.icon_options_widget, "Options")
 
         splash.showMessage("Preparing raw_data for UI Elements...")
@@ -144,6 +153,10 @@ class ProfileExplorerWindow(QMainWindow):
         self.icon_options_select.setCurrentIndex(cur_icon_idx)
         self.nameplate_options_select.setCurrentIndex(cur_nameplate_idx)
         self.frame_options_select.setCurrentIndex(cur_frame_idx)
+
+
+    def handleProfileNameChanged(self, name: str):
+        self.profile_view.setProfileName(name)
 
 
     def handleIconSelectionChanged(self, index: int):
