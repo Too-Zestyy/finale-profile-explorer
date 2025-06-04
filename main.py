@@ -15,180 +15,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow,
                                QFrame, QFormLayout, QSizePolicy, QRadioButton, QHBoxLayout, QGridLayout, QButtonGroup)
 from PySide6.QtGui import QPixmap, Qt, QIcon
 
-icon_key = "Icon"
-nameplate_key = "Nameplate"
-frame_key = "Frame"
-
-english_lang = "en"
-japanese_lang = "jp"
-
-def get_profile_screen_pixmaps(data_path: Path) -> dict[str, dict[int, dict]]:
-    pixmap_dict = {
-        icon_key: {},
-        nameplate_key: {},
-        frame_key: {}
-    }
-
-    icon_path = data_path / 'user_icons'
-    deka_icon_path = data_path / 'user_icons_deka'
-    nameplate_path = data_path / 'user_nameplates'
-    frame_path = data_path / 'user_frames'
-
-    for file in deka_icon_path.iterdir():
-        if file.is_file() and file.suffix == '.png':
-            pixmap_dict[icon_key][int(file.stem)] = {"img": QPixmap(str(file.absolute())), "deka": True}
-    for file in icon_path.iterdir():
-        if file.is_file() and file.suffix == '.png' and int(file.stem) not in pixmap_dict[icon_key].keys():
-            pixmap_dict[icon_key][int(file.stem)] = {"img": QPixmap(str(file.absolute())), "deka": False}
-
-    for file in nameplate_path.iterdir():
-        if file.is_file() and file.suffix == '.png':
-            pixmap_dict[nameplate_key][int(file.stem)] = {"img": QPixmap(str(file.absolute()))}
-
-    for file in frame_path.iterdir():
-        if file.is_file() and file.suffix == '.png':
-            pixmap_dict[frame_key][int(file.stem)] = {"img": QPixmap(str(file.absolute()))}
-
-    return pixmap_dict
-
-
-
-def get_profile_image_data(data_path: Path):
-    pixmap_dict = get_profile_screen_pixmaps(data_path)
-
-    with sqlite3.connect(data_path / "customisations.db") as conn:
-        cur = conn.cursor()
-
-        for customisation_type in pixmap_dict:
-            q = (f"SELECT id, name_en, description_en, name_jp, description_jp FROM customisations"
-                 f"   WHERE customisation_type_id = "
-                 f"       (SELECT id "
-                 f"           FROM customisation_types "
-                 f"           WHERE name_en = ?)"
-                 # Make a wildcard for each image, and fill it using `pixmap_dict`
-                 f"    AND id IN ({",".join(["?"] * len(pixmap_dict[customisation_type]))});")
-            image_info = cur.execute(q,
-                                     (customisation_type, *pixmap_dict[customisation_type].keys(),)
-                                     ).fetchall()
-
-            for row in image_info:
-                image_dict = pixmap_dict[customisation_type][row[0]]
-
-                image_dict["name_en"] = row[1]
-                image_dict["description_en"] = row[2]
-                image_dict["name_jp"] = row[3]
-                image_dict["description_jp"] = row[4]
-
-    return pixmap_dict
-
-
-def get_image_options_from_data_dict(data_dict: dict[int, dict[str, str | QPixmap]]):
-    options = []
-
-    for image_id in data_dict:
-        options.append(
-            (
-                image_id,
-                f"[{image_id}] {data_dict[image_id]["name_en"]}",
-            )
-        )
-
-    return sorted(options, key=lambda x: x[0])
-
-
-ComboboxOption = namedtuple('ComboboxOption', ['ID', 'Text'])
-
-
-class ProfileCustomisationDataManager:
-
-    def __init__(self, data: dict[str, dict[int, dict[str, str | QPixmap]]]):
-        self.data = data
-
-        icon_combobox_options = self.build_image_combobox_options(data[icon_key])
-        self.english_icon_combobox_options = self.get_english_options(icon_combobox_options)
-        self.japanese_icon_combobox_options = self.get_japanese_options(icon_combobox_options)
-
-        nameplate_combobox_options = self.build_image_combobox_options(data[nameplate_key])
-        self.english_nameplate_combobox_options = self.get_english_options(nameplate_combobox_options)
-        self.japanese_nameplate_combobox_options = self.get_japanese_options(nameplate_combobox_options)
-
-        frame_combobox_options = self.build_image_combobox_options(data[frame_key])
-        self.english_frame_combobox_options = self.get_english_options(frame_combobox_options)
-        self.japanese_frame_combobox_options = self.get_japanese_options(frame_combobox_options)
-
-
-
-    def build_image_combobox_options(self, customisation_options: dict[int, dict[str, str | QPixmap]]):
-        options = []
-
-        for image_id in customisation_options:
-            options.append(
-                (
-                    image_id,
-                    f"[{image_id}] {customisation_options[image_id][f"name_{english_lang}"]}",
-                    f"[{image_id}] {customisation_options[image_id][f"name_{japanese_lang}"]}",
-                )
-            )
-
-        return sorted(options, key=lambda x: x[0])
-
-
-    def get_language_options(self, multi_lang_options, lang=english_lang) -> tuple[ComboboxOption]:
-        if lang == english_lang:
-            text_idx = 1
-        elif lang == japanese_lang:
-            text_idx = 2
-        else:
-            raise ValueError("Invalid language selected.")
-
-        return [ComboboxOption(ID=option[0], Text=option[text_idx]) for option in multi_lang_options]
-
-    def get_english_options(self, multi_lang_options):
-        return self.get_language_options(multi_lang_options, english_lang)
-
-    def get_japanese_options(self, multi_lang_options):
-        return self.get_language_options(multi_lang_options, japanese_lang)
-
-
-class ProfileView(QGraphicsView):
-    def __init__(self, parent=None):
-        QGraphicsView.__init__(self, parent)
-        self.setGeometry(0, 0, 720, 300)
-        # Set minimum dimensions to account for both profile and border (at 1px per side)
-        self.setMinimumSize(722, 302)
-        # Unnecessary with minimum size enforcement
-        # self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        self.profile_scene = QGraphicsScene()
-        self.setScene(self.profile_scene)
-
-        self.icon_graphics_item = QGraphicsPixmapItem()
-        self.nameplate_graphics_item = QGraphicsPixmapItem()
-        self.nameplate_graphics_item.setPos(QPoint(143, 0))
-        self.frame_graphics_item = QGraphicsPixmapItem()
-
-        self.profile_scene.addItem(self.frame_graphics_item)
-        self.profile_scene.addItem(self.icon_graphics_item)
-        self.profile_scene.addItem(self.nameplate_graphics_item)
-
-    def setIcon(self, icon: QPixmap, is_deka_icon: bool):
-        self.icon_graphics_item.setPixmap(icon)
-        if not is_deka_icon:
-            self.icon_graphics_item.setPos(QPoint(15, 15))
-        else:
-            self.icon_graphics_item.setPos(QPoint(0, 0))
-
-    def setNameplate(self, nameplate: QPixmap):
-        self.nameplate_graphics_item.setPixmap(nameplate)
-
-    def setFrame(self, frame: QPixmap):
-        self.frame_graphics_item.setPixmap(frame)
-
-    def setProfileCustomisations(self, icon: QPixmap, nameplate: QPixmap, frame: QPixmap, is_deka_icon: bool):
-        self.setFrame(frame)
-        self.setNameplate(nameplate)
-        self.setIcon(icon, is_deka_icon)
+from components.widgets import ProfileView
+from data_management.img_data import ICON_KEY, LANG_EN, LANG_JP, NAMEPLATE_KEY, FRAME_KEY, \
+    get_profile_image_data, ProfileCustomisationDataManager
 
 
 
@@ -201,8 +30,7 @@ class ProfileExplorerWindow(QMainWindow):
         splash.show()
 
         splash.showMessage("Loading Image Data...")
-        self.image_data = get_profile_image_data(Path("./data"))
-        self.data_manager = ProfileCustomisationDataManager(self.image_data)
+        self.data_manager = ProfileCustomisationDataManager(Path("./data"))
 
         splash.showMessage("Loading UI...")
         self.setWindowTitle("Finale Profile Explorer")
@@ -253,11 +81,10 @@ class ProfileExplorerWindow(QMainWindow):
         self.icon_options_widget.setLayout(self.icon_options_layout)
         self.menu_tabs.addTab(self.icon_options_widget, "Options")
 
-        splash.showMessage("Preparing data for UI Elements...")
+        splash.showMessage("Preparing raw_data for UI Elements...")
 
-        # icon_selector_options = get_image_options_from_data_dict(self.image_data[icon_key])
+        # icon_selector_options = get_image_options_from_data_dict(self.data_manager.raw_data[ICON_KEY])
         self.english_language_choice.click()
-
 
         self.randomiser_button = QPushButton("Click me!")
         self.randomiser_button.clicked.connect(self.handleRandomiserButtonClicked)
@@ -327,15 +154,15 @@ class ProfileExplorerWindow(QMainWindow):
             return
 
         self.profile_view.setIcon(
-            self.image_data[icon_key][img_id]["img"],
-            self.image_data[icon_key][img_id]["deka"],
+            self.data_manager.raw_data[ICON_KEY][img_id]["img"],
+            self.data_manager.raw_data[ICON_KEY][img_id]["deka"],
         )
 
         if self.english_language_choice.isChecked():
-            objective_key = f"description_{english_lang}"
+            objective_key = f"description_{LANG_EN}"
         else:
-            objective_key = f"description_{japanese_lang}"
-        self.icon_objective_label.setText(f"<b>Icon:</b> {self.image_data[icon_key][img_id][objective_key]}")
+            objective_key = f"description_{LANG_JP}"
+        self.icon_objective_label.setText(f"<b>Icon:</b> {self.data_manager.raw_data[ICON_KEY][img_id][objective_key]}")
 
     def handleNameplateSelectionChanged(self, index: int):
         img_id = self.nameplate_options_select.currentData()
@@ -345,14 +172,14 @@ class ProfileExplorerWindow(QMainWindow):
             return
 
         self.profile_view.setNameplate(
-            self.image_data[nameplate_key][img_id]["img"],
+            self.data_manager.raw_data[NAMEPLATE_KEY][img_id]["img"],
         )
 
         if self.english_language_choice.isChecked():
-            objective_key = f"description_{english_lang}"
+            objective_key = f"description_{LANG_EN}"
         else:
-            objective_key = f"description_{japanese_lang}"
-        self.nameplate_objective_label.setText(f"<b>Nameplate:</b> {self.image_data[nameplate_key][img_id][objective_key]}")
+            objective_key = f"description_{LANG_JP}"
+        self.nameplate_objective_label.setText(f"<b>Nameplate:</b> {self.data_manager.raw_data[NAMEPLATE_KEY][img_id][objective_key]}")
 
     def handleFrameSelectionChanged(self, index: int):
         img_id = self.frame_options_select.currentData()
@@ -362,14 +189,14 @@ class ProfileExplorerWindow(QMainWindow):
             return
 
         self.profile_view.setFrame(
-            self.image_data[frame_key][img_id]["img"],
+            self.data_manager.raw_data[FRAME_KEY][img_id]["img"],
         )
 
         if self.english_language_choice.isChecked():
-            objective_key = f"description_{english_lang}"
+            objective_key = f"description_{LANG_EN}"
         else:
-            objective_key = f"description_{japanese_lang}"
-        self.frame_objective_label.setText(f"<b>Frame:</b> {self.image_data[frame_key][img_id][objective_key]}")
+            objective_key = f"description_{LANG_JP}"
+        self.frame_objective_label.setText(f"<b>Frame:</b> {self.data_manager.raw_data[FRAME_KEY][img_id][objective_key]}")
 
 if __name__ == "__main__":
     app = QApplication([])
